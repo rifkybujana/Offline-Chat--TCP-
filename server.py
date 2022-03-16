@@ -135,6 +135,26 @@ class ServerSocket(threading.Thread):
                     # Send the new data to everyone
                     self.server.broadcast(message, self.sockname)
 
+                elif signal == "[file]":
+                    file = message.split(';')
+                    file = file[1:len(file)-1]
+
+                    for content in file:
+                        self.server.data.append(
+                            {
+                                "question": content,
+                                "answer": " "
+                            }
+                        )
+
+                    # Save data
+                    serialized_data = json.dumps(self.server.data)
+                    with open(DATA_PATH, 'w') as f:
+                        f.write(serialized_data)
+
+                    # Send the new data to everyone
+                    self.server.broadcast("[data];" + serialized_data + ";[end]", self.sockname)
+
                 elif signal == "[message]":
                     self.server.broadcast(message, self.sockname)
                 

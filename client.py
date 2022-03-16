@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 import tkinter as tk
+import tkinter.filedialog
 import json
 import sympy as sy
 
@@ -194,6 +195,12 @@ class Client:
         if not self.questions or not self.answers:
             return
         
+        if len(question) <= 0:
+            question = " "
+            
+        if len(answer) <= 0:
+            answer = " "
+
         try:
             self.sock.sendall("[new data];{};{};{};[end]".format(question, answer, id[0]).encode('utf-8'))
         except Exception as e:
@@ -210,14 +217,26 @@ class Client:
             self.answers.insert(tk.END, '')
             self.questions.insert(tk.END, '')
 
-        if len(question) <= 0:
-            question = " "
-            
-        if len(answer) <= 0:
-            answer = " "
-
         self.questions.see(id[0] + 1)
         self.answers.see(id[0] + 1)
+
+    def sendFile(self, id, file):
+        if not self.questions or not self.answers:
+            return
+
+        message = "[file];"
+        for i, content in enumerate(file):
+            message += content + ";"
+            self.questions.insert((id[0] + i,), content)
+            self.answers.insert((id[0] + i,), " ")
+
+        message += "[end]"
+
+        try:
+            self.sock.sendall(message.encode('utf-8'))
+        except Exception as e:
+            print(str(e))
+            return
 
     def request(self):
         self.sock.sendall("[request data];[end]".encode('utf-8'))
@@ -335,12 +354,12 @@ def openGDocs(parent, button, client, receive):
     answers.bind('<<ListboxSelect>>', lambda x: questions.selection_clear(0))
     questions.bind('<<ListboxSelect>>', lambda x: answers.selection_clear(0))
 
-    fromMessage.grid(row=0, column=0, columnspan=3, sticky="nsew")
+    fromMessage.grid(row=0, column=0, columnspan=4, sticky="nsew")
     fromEntry = tk.Frame(master=window)
     textInput = tk.Entry(master=fromEntry)
     textInput.insert(0, "Insert your question/answer here!")
 
-    def SendQnA():
+    def sendQnA():
         if len(questions.curselection()) > 0:
             index = questions.curselection()
             client.sendData(
@@ -369,13 +388,13 @@ def openGDocs(parent, button, client, receive):
     textInput.pack(fill=tk.BOTH, expand=True)
     textInput.bind(
         "<Return>", 
-        lambda x: SendQnA()
+        lambda x: sendQnA()
     )
     
     btnSend = tk.Button(
         master=window,
         text="Send",
-        command=SendQnA
+        command=sendQnA
     )
 
     btnRefresh = tk.Button(
@@ -384,15 +403,39 @@ def openGDocs(parent, button, client, receive):
         command=lambda: client.request()
     )
 
+    def sendFile():
+        path = tk.filedialog.askopenfilename(
+            initialdir = "/",
+            title = "Select a File",
+            filetypes = (
+                ("text files", "*.txt"),
+                ('All files', '*.*')
+            )
+        )
+
+        with open(path) as f:
+            contents = f.readlines()
+            
+        questions.selection_set(tk.END)
+        client.sendFile(questions.curselection(), contents)
+
+    btnUpload = tk.Button(
+        master=window,
+        text="Upload",
+        command=lambda: sendFile()
+    )
+
     fromEntry.grid(row=1, column=0, padx=10, sticky="ew")
     btnSend.grid(row=1, column=1, pady=10, sticky="ew")
     btnRefresh.grid(row=1, column=2, pady=10, sticky="ew")
+    btnUpload.grid(row=1, column=3, pady=10, sticky="ew")
     
     window.rowconfigure(0, minsize=500, weight=1)
     window.rowconfigure(1, minsize=50, weight=0)
     window.columnconfigure(0, minsize=500, weight=1)
     window.columnconfigure(1, minsize=100, weight=0)
     window.columnconfigure(2, minsize=100, weight=0)
+    window.columnconfigure(3, minsize=100, weight=0)
 
     def changeButtonState():
         if button['state'] == "normal":
