@@ -416,8 +416,7 @@ def openGDocs(parent, button, client, receive):
         with open(path) as f:
             contents = f.readlines()
             
-        questions.selection_set(tk.END)
-        client.sendFile(questions.curselection(), contents)
+        client.sendFile((questions.size() - 1,), contents)
 
     btnUpload = tk.Button(
         master=window,
