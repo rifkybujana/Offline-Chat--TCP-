@@ -1,7 +1,11 @@
 # GUI Components
+from ctypes import alignment
+from email.message import Message
+from re import S
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+from pyparsing import null_debug_action
 
 # UI Components
 import qtawesome as qta
@@ -70,6 +74,20 @@ COMPONENT_BUTTON_STYLE = """
     border: 1px solid #c4c3d9;
 }
 """
+BUBBLE_INCOME_STYLE = """
+* {
+    background-color: white;
+    border: 1px solid #e6e6f0;
+    border-radius: 10px;
+}
+"""
+BUBBLE_OUTCOME_STYLE = """
+* {
+    background-color: #e6e6f0;
+    border: 1px solid #d1d1e3;
+    border-radius: 10px;
+}
+"""
 
 # FONTS
 DEFAULT_FONT_FAMILY = "MS Shell Dlg 2"
@@ -86,6 +104,7 @@ LOGO_PATH_ICO = os.path.join(RESOURCE_PATH, "logo.ico")
 WINDOW_SIZE = QSize(600, 450)
 WINDOW_TITLE = "Megalitikum Robotikum"
 
+OTHER_WINDOW = []
 
 class Color(QWidget):
     """Widget to check layout"""
@@ -108,9 +127,7 @@ class AuthWidget(QWidget):
 
         image_label = QLabel()
         image_label.setPixmap(
-            QPixmap(LOGO_PATH_PNG).
-            scaledToHeight(500).
-            scaledToWidth(250)
+            QPixmap(LOGO_PATH_PNG).scaledToWidth(250)
         )
 
         layout.addWidget(image_label, stretch=5, alignment=Qt.AlignCenter)
@@ -199,7 +216,12 @@ class MessageWidget(QWidget):
 
         layout.addWidget(self.search, 1)
 
-        layout.addWidget(Color("green"), 9)
+        self.listMessage = QListWidget()
+        self.listMessage.setStyleSheet("* { border: none; }")
+        self.listMessage.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.listMessage.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        
+        layout.addWidget(self.listMessage, 9)
         
         self.message_input = QLineEdit()
         self.message_input.setFont(DEFAULT_FONT)
@@ -212,12 +234,13 @@ class MessageWidget(QWidget):
 
         component_layout.addSpacing(10)
 
-        def add_component_button(action, icon):
+        def add_component_button(action, icon, tooltip):
             button = QPushButton(icon, "")
             button.setFont(DEFAULT_FONT_BOLD)
-            button.setFixedSize(24, 24)
+            button.setFixedSize(32, 32)
             button.setStyleSheet(COMPONENT_BUTTON_STYLE)
-            button.setIconSize(QSize(20, 20))
+            button.setIconSize(QSize(16, 16))
+            button.setToolTip(tooltip)
 
             button.pressed.connect(action)
 
@@ -227,19 +250,23 @@ class MessageWidget(QWidget):
 
         gdocs_button = add_component_button(
             lambda: print("test"), 
-            qta.icon("mdi.file-document-outline")
+            qta.icon("mdi.file-document-outline"),
+            "gdocs"
         )
         math_button = add_component_button(
             lambda: print("test"), 
-            qta.icon("mdi.math-integral")
+            qta.icon("mdi.math-integral"),
+            "math solver"
         )
         image_button = add_component_button(
             lambda: print("test"), 
-            qta.icon("fa.file-image-o")
+            qta.icon("fa.file-image-o"),
+            "send image"
         )
         file_button = add_component_button(
             lambda: print("test"), 
-            qta.icon("ri.attachment-line")
+            qta.icon("ri.attachment-line"),
+            "send attachment"
         )
 
         component_layout.addWidget(Color("purple"), 10)
@@ -252,19 +279,261 @@ class MessageWidget(QWidget):
 
         self.message_input.setFocus()
 
+    def addIncomeItem(self, username, message):
+        message = IncomeChatBubble(username, message)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
 
-class ChatBubble(QWidget):
-    def __init__(self, *args, **kwargs):
-        super(ChatBubble, self).__init__(*args, **kwargs)
+    def addOutcomeItem(self, username, message):
+        message = OutcomeChatBubble(username, message)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
 
+    def addIncomeImageBubble(self, username, image):
+        message = IncomeImageBubble(username, image)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
         
+    def addOutcomeImageBubble(self, username, image):
+        message = OutcomeImageBubble(username, image)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
+
+
+class IncomeChatBubble(QWidget):
+    def __init__(self, username, message, *args, **kwargs):
+        super(IncomeChatBubble, self).__init__(*args, **kwargs)
+
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setLineWidth(1)
+        frame.setLayout(QVBoxLayout())
+        frame.setStyleSheet(BUBBLE_INCOME_STYLE)
+        
+        frame_h_layout = QHBoxLayout()
+        frame_h_layout.addWidget(frame, 0)
+        frame_h_layout.addWidget(Color("red"), 5)
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignLeft)
+        
+        layout.addLayout(frame_h_layout, 3)
+        
+        self.message = QLabel(message)
+        self.message.setFont(DEFAULT_FONT)
+        self.message.setWordWrap(True)
+        self.message.setStyleSheet("* { background-color: transparent; border: none; }")
+        frame.layout().addWidget(self.message, alignment=Qt.AlignTop | Qt.AlignLeft)
+
+        self.setLayout(layout)
+
+    def __str__(self) -> str:
+        return self.message.text()
+
+
+class OutcomeChatBubble(QWidget):
+    def __init__(self, username, message, *args, **kwargs):
+        super(OutcomeChatBubble, self).__init__(*args, **kwargs)
+
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setLineWidth(1)
+        frame.setLayout(QVBoxLayout())
+        frame.setStyleSheet(BUBBLE_OUTCOME_STYLE)
+        
+        frame_h_layout = QHBoxLayout()
+        frame_h_layout.addWidget(Color("red"), 5)
+        frame_h_layout.addWidget(frame, 0)
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignRight)
+        
+        layout.addLayout(frame_h_layout, 3)
+        
+        self.message = QLabel(message)
+        self.message.setFont(DEFAULT_FONT)
+        self.message.setWordWrap(True)
+        self.message.setStyleSheet("* { background-color: transparent; border: none; }")
+        frame.layout().addWidget(self.message, alignment=Qt.AlignTop | Qt.AlignRight)
+
+        self.setLayout(layout)
+
+    def __str__(self) -> str:
+        return self.message.text()
+
+
+class ImageViewer(QWidget):
+    def __init__(self, image, *args, **kwargs):
+        super(ImageViewer, self).__init__(*args, **kwargs)
+
+        pixmap = QPixmap(image)
+        pixmap = pixmap.scaled(
+            QSize(
+                min(
+                    pixmap.width(),
+                    800
+                ),
+                min(
+                    pixmap.height(),
+                    600
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        self.image_label = QLabel(self)
+        self.image_label.setScaledContents(True)
+        self.image_label.setBackgroundRole(QPalette.Base)
+        self.image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.image_label.setPixmap(pixmap)
+
+        self.setFixedSize(pixmap.size())
+
+
+class IncomeImageBubble(QWidget):
+    def __init__(self, username, image, *args, **kwargs):
+        super(IncomeImageBubble, self).__init__(*args, **kwargs)
+
+        self.image = image
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.layout().addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignLeft)
+
+        image_layout = QHBoxLayout()
+
+        self.image_label = QLabel()
+        self.image_label.setMaximumHeight(200)
+        self.image_label.setMaximumWidth(300)
+        original_pixmap = QPixmap(self.image)
+        original_pixmap = original_pixmap.scaled(
+            QSize(
+                min(
+                    original_pixmap.width(),
+                    self.image_label.maximumWidth()
+                ),
+                min(
+                    original_pixmap.height(),
+                    self.image_label.maximumHeight()
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        pixmap = QPixmap(original_pixmap.size())
+        pixmap.fill(QColor("transparent"))
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(original_pixmap))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(original_pixmap.rect(), 10, 10)
+
+        self.image_label.setPixmap(pixmap)
+        self.image_label.mousePressEvent = self.openImage
+        
+        del painter
+
+        image_layout.addWidget(self.image_label, 0)
+        image_layout.addWidget(Color("red"), 5)
+
+        layout.addLayout(image_layout)
+
+        self.setLayout(layout)
+
+    def openImage(self, event):
+        global OTHER_WINDOW
+        self.w = ImageViewer(self.image)
+        self.w.show()
+
+        OTHER_WINDOW.append(self.w)
+
+
+class OutcomeImageBubble(QWidget):
+    def __init__(self, username, image, *args, **kwargs):
+        super(OutcomeImageBubble, self).__init__(*args, **kwargs)
+
+        self.image = image
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.layout().addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignRight)
+
+        image_layout = QHBoxLayout()
+
+        self.image_label = QLabel()
+        self.image_label.setMaximumHeight(200)
+        self.image_label.setMaximumWidth(300)
+        original_pixmap = QPixmap(self.image)
+        original_pixmap = original_pixmap.scaled(
+            QSize(
+                min(
+                    original_pixmap.width(),
+                    self.image_label.maximumWidth()
+                ),
+                min(
+                    original_pixmap.height(),
+                    self.image_label.maximumHeight()
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        pixmap = QPixmap(original_pixmap.size())
+        pixmap.fill(QColor("transparent"))
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(original_pixmap))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(original_pixmap.rect(), 10, 10)
+
+        self.image_label.setPixmap(pixmap)
+        self.image_label.mousePressEvent = self.openImage
+        
+        del painter
+
+        image_layout.addWidget(Color("red"), 5)
+        image_layout.addWidget(self.image_label, 0)
+
+        layout.addLayout(image_layout)
+
+        self.setLayout(layout)
+
+    def openImage(self, event):
+        global OTHER_WINDOW
+        self.w = ImageViewer(self.image)
+        self.w.show()
+
+        OTHER_WINDOW.append(self.w)
 
 
 class MainWindow(QMainWindow):
-    """
-    Window for user to connect to the server
-    """
-
     def __init__(self):
         super().__init__()
 
@@ -279,6 +548,13 @@ class MainWindow(QMainWindow):
 
         # Show window, windows are hidden by default.
         self.show()
+
+    def closeEvent(self, event):
+        global OTHER_WINDOW
+        for window in OTHER_WINDOW:
+            window.close()
+            
+        event.accept()
 
     def showWidget(self, widget, *args):
         self.currentWidget = widget(self)
