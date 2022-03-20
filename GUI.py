@@ -1,11 +1,7 @@
 # GUI Components
-from ctypes import alignment
-from email.message import Message
-from re import S
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from pyparsing import null_debug_action
 
 # UI Components
 import qtawesome as qta
@@ -13,8 +9,6 @@ import qtawesome as qta
 # Needed to access some system data
 import sys
 import os
-
-import time
 
 # STYLESHEET
 WINDOW_STYLE = """
@@ -220,6 +214,16 @@ class MessageWidget(QWidget):
         self.listMessage.setStyleSheet("* { border: none; }")
         self.listMessage.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.listMessage.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+        
+        # example        
+        self.addIncomeItem("badrul", "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
+        self.addOutcomeItem("udin", "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.")
+
+        self.addIncomeImageBubble("badrul", os.path.join(RESOURCE_PATH, "example2.jpg"))
+        self.addOutcomeImageBubble("udin", os.path.join(RESOURCE_PATH, "example.png"))
+        # example
+
         
         layout.addWidget(self.listMessage, 9)
         
@@ -229,6 +233,7 @@ class MessageWidget(QWidget):
         self.message_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.message_input.setStyleSheet(LINEEDIT_STYLE)
         self.message_input.returnPressed.connect(lambda: print(self.message_input.text()))
+        # self.message_input.installEventFilter(self)
 
         layout.addWidget(self.message_input, 1)
 

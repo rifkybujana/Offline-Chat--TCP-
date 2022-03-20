@@ -97,63 +97,17 @@ class ServerSocket(threading.Thread):
                     # Check if this username are already logged in
                     if username in [connection.username for connection in self.server.connections] or not username in usernames :
                         self.server.sendTo("[response];fail;[end]", self.sockname)
+                        self.server.remove_connection(self)
                         self.sc.close()
 
                     # Log in
                     else:
                         self.username = username
                         self.server.sendTo("[response];ok;[end]", self.sockname)
-                        self.server.broadcast("[message];Server: {} has joined the chat;[end]".format(self.username), self.sockname)
+                        self.server.broadcast("[message];Server;{} has joined the chat;[end]".format(self.username), self.sockname)
 
-                elif signal == "[request data]":
-                    # Send data to the requester
-                    self.server.sendTo(
-                        "[data];" + json.dumps(self.server.data) + ";[end]", 
-                        self.sockname
-                    )
-
-                elif signal == "[new data]":
-                    index = int(message.split(';')[3])
-                    if index > len(self.server.data) - 1:
-                        # Append new data 
-                        self.server.data.append(
-                            {
-                                "question": message.split(';')[1],
-                                "answer": message.split(';')[2]
-                            }
-                        )
-                    else:
-                        # Change data
-                        self.server.data[index]["question"] = message.split(';')[1]
-                        self.server.data[index]["answer"] = message.split(';')[2]
-
-                    # Save the new data
-                    serialized_data = json.dumps(self.server.data)
-                    with open(DATA_PATH, 'w') as f:
-                        f.write(serialized_data)
-
-                    # Send the new data to everyone
-                    self.server.broadcast(message, self.sockname)
-
-                elif signal == "[file]":
-                    file = message.split(';')
-                    file = file[1:len(file)-1]
-
-                    for content in file:
-                        self.server.data.append(
-                            {
-                                "question": content,
-                                "answer": " "
-                            }
-                        )
-
-                    # Save data
-                    serialized_data = json.dumps(self.server.data)
-                    with open(DATA_PATH, 'w') as f:
-                        f.write(serialized_data)
-
-                    # Send the new data to everyone
-                    self.server.broadcast("[data];" + serialized_data + ";[end]", self.sockname)
+                elif signal == "[image]":
+                    pass
 
                 elif signal == "[message]":
                     self.server.broadcast(message, self.sockname)

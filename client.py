@@ -1,463 +1,584 @@
+# Network Components
+from concurrent.futures import thread
+from email import message
+from pydoc import cli
 import threading
 import socket
-import argparse
-import os
+
+# GUI Components
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+
+# UI Components
+import qtawesome as qta
+
+# System Components
 import sys
-import tkinter as tk
-import tkinter.filedialog
+import os
+
+# Data Components
 import json
-import sympy as sy
+
+# STYLESHEET
+WINDOW_STYLE = """
+* {
+    background-color: white;
+}
+"""
+LINEEDIT_STYLE = """
+* {
+    border: 1px solid #ECC8C8;
+    border-radius: 5px;
+    padding-left: 10px;
+}
+*:focus {
+    border: 1px solid #ECC8C8;
+    border-radius: 5px;
+    border-bottom: 2px solid #5e5eff;
+}
+"""
+SEARCH_BAR_STYLE = """
+* {
+    border-style: none none solid none;
+    border-bottom-width: 1px;
+    border-bottom-color: #ECC8C8;
+}
+*:focus {
+    border-bottom-width: 2px;
+    border-bottom-color: #5e5eff;
+}
+"""
+SUBMIT_BUTTON_STYLE = """
+* {
+    color: white;
+    background-color: #9b49de;
+    border: 1px solid #ECC8C8;
+    border-radius: 5px
+}
+*:hover {
+    background-color: #6f16b8;
+}
+*:pressed {
+    background-color: #4e0887;
+}
+"""
+COMPONENT_BUTTON_STYLE = """
+* {
+    background-color: transparent;
+    border: 1px hidden white;
+    border-radius: 3px;
+}
+*:hover {
+    background-color: #d9d8eb;
+    border: 1px solid #d9d8eb;
+}
+*:pressed {
+    background-color: #c4c3d9;
+    border: 1px solid #c4c3d9;
+}
+"""
+BUBBLE_INCOME_STYLE = """
+* {
+    background-color: white;
+    border: 1px solid #e6e6f0;
+    border-radius: 10px;
+}
+"""
+BUBBLE_OUTCOME_STYLE = """
+* {
+    background-color: #e6e6f0;
+    border: 1px solid #d1d1e3;
+    border-radius: 10px;
+}
+"""
+
+# FONTS
+DEFAULT_FONT_FAMILY = "MS Shell Dlg 2"
+DEFAULT_FONT = QFont(DEFAULT_FONT_FAMILY, 9)
+DEFAULT_FONT_BOLD = QFont(DEFAULT_FONT_FAMILY, 9)
+DEFAULT_FONT_BOLD.setBold(True)
+
+# PATHS
+RESOURCE_PATH = os.path.join(os.getcwd(), "resource")
+LOGO_PATH_PNG = os.path.join(RESOURCE_PATH, "logo.png")
+LOGO_PATH_ICO = os.path.join(RESOURCE_PATH, "logo.ico")
+
+# WINDOW SETTINGS
+WINDOW_SIZE = QSize(600, 450)
+WINDOW_TITLE = "Megalitikum Robotikum"
+
+OTHER_WINDOW = []
 
 
-class Send(threading.Thread):
-    # Listens for user input from command line
+class Color(QWidget):
+    """Widget to check layout"""
+    def __init__(self, color):
+        super(Color, self).__init__()
+        self.setAutoFillBackground(True)
 
-    # sock the connected sock object
-    # name (str) : The username provided by the user
-
-    def __init__(self, sock, name):
-        super().__init__()
-        self.sock = sock
-        self.name = name
-
-    def run(self):
-        # Listen for the user input from the command line and send it to the server
-        # Type "QUIT" to exit the app
-
-        while True:
-            print("""{}: """.format(self.name), end='')
-            sys.stdout.flush()
-            message = sys.stdin.readline()[:-1]
-
-            # type "QUIT" to leave the app
-
-            if message == "QUIT":
-                self.sock.sendall("[message];Server: {} has left.;[end]""".format(self.name).encode('utf-8'))
-                break
-
-            # send message to server for broadcasting
-            else:
-                self.sock.sendall("[message];{} : {};[end]".format(self.name, message).encode('utf-8'))
-
-        print('\nQuitting...')
-        self.sock.close()
-        os._exit(0)
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(color))
+        self.setPalette(palette)
 
 
-class Receive(threading.Thread):
-    # Listens for incoming messages from the server
-    
-    def __init__(self, sock, name):
-        super().__init__()
-        self.sock = sock
-        self.name = name
-        self.messages = None
-        self.questions = None
-        self.answers = None
+class AuthWidget(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(AuthWidget, self).__init__(*args, **kwargs)
 
-    def run(self):
+        layout = QVBoxLayout()
 
-        # Receives data from the server and displays it in the gui
+        layout.addSpacing(50)
 
-        while (True):
-            message = self.receive()
-
-            if message:
-                signals = message.split(';')[0]
-
-                if signals == "[response]":
-                    if message.split(';')[1] == "fail":
-                        print('\nAuthentication Failed!\n')
-                        print('\nQuitting...')
-                        self.sock.close()
-                        os._exit(0)
-
-                    elif message.split(';')[1] == "ok":
-                        print('\nAuthentication Success!\n')
-                        
-                elif signals == "[data]":
-                    # if we receive a response from server
-                    if self.questions and self.answers:
-                        # load data
-                        data = json.loads(message.split(';')[1])
-
-                        # clear list
-                        self.questions.delete(0, tk.END)
-                        self.answers.delete(0, tk.END)
-
-                        for i, j in enumerate(data):
-                            self.questions.insert(i, j['question'])
-                            self.answers.insert(i, j['answer'])
-
-                        # add space at the end
-                        self.questions.insert(tk.END, "")
-                        self.answers.insert(tk.END, "")
-
-                elif signals == "[new data]":
-                    index = int(message.split(';')[3])
-                    if self.questions and self.answers:
-                        self.questions.delete(index)
-                        self.answers.delete(index)
-
-                        self.questions.insert(index, message.split(';')[1])
-                        self.answers.insert(index, message.split(';')[2])
-                        
-                        if len(self.questions.get(tk.END)) > 0:
-                            self.questions.insert(tk.END, "")
-                            self.answers.insert(tk.END, "")
-                        
-                elif signals == "[message]":
-                    if self.messages:
-                        self.messages.insert(tk.END, message.split(';')[1])
-
-                    self.messages.see(tk.END)
-                    print('\r{}\n{}: '.format(message.split(';')[1], self.name), end='')
-
-            else:
-                print('\n Lost connection to the server!')
-                print('\nQuitting...')
-                self.sock.close()
-                os._exit(0)
-        
-    def receive(self):
-        message = ""
-        while (True):
-            try: message += self.sock.recv(1024).decode('utf-8')
-            except: return None
-
-            if message.__contains__("[end]"):
-                return message
-
-
-class Client:
-    # management of client-server connection and integration of GUI
-    
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(
-            socket.AF_INET, 
-            socket.SOCK_STREAM
+        image_label = QLabel()
+        image_label.setPixmap(
+            QPixmap(LOGO_PATH_PNG).scaledToWidth(250)
         )
-        self.name = None
-        self.messages = None
-        self.questions = None
-        self.answers = None
+
+        layout.addWidget(image_label, stretch=5, alignment=Qt.AlignCenter)
+
+        self.ip_addr = QLineEdit()
+        self.ip_addr.setFont(DEFAULT_FONT)
+        self.ip_addr.setPlaceholderText("192.168.1.4")
+        self.ip_addr.setFixedSize(300, 30)
+        self.ip_addr.setAlignment(Qt.AlignCenter)
+        self.ip_addr.setStyleSheet(LINEEDIT_STYLE)
+
+        layout.addWidget(self.ip_addr, stretch=1, alignment=Qt.AlignCenter)
+
+        self.username = QLineEdit()
+        self.username.setFont(DEFAULT_FONT)
+        self.username.setPlaceholderText("Username")
+        self.username.setFixedSize(300, 30)
+        self.username.setAlignment(Qt.AlignCenter)
+        self.username.setStyleSheet(LINEEDIT_STYLE)
+
+        layout.addWidget(self.username, stretch=1, alignment=Qt.AlignCenter)
+
+        submit_button = QPushButton("Connect")
+        submit_button.setFont(DEFAULT_FONT_BOLD)
+        submit_button.setFixedSize(300, 30)
+        submit_button.setStyleSheet(SUBMIT_BUTTON_STYLE)
+
+        layout.addWidget(submit_button, stretch=1, alignment=Qt.AlignCenter)
+        
+        self.ip_addr.returnPressed.connect(self.username.setFocus)
+        self.username.returnPressed.connect(self.connect)
+        submit_button.pressed.connect(self.connect)
+
+        layout.addSpacing(50)
+
+        widget = QWidget()
+        widget.setLayout(layout)
+        
+        self.setLayout(layout)
+
+    def connect(self):
+        if len(self.ip_addr.text()) <= 0 or len(self.username.text()) <= 0:
+            return
+
+        super().parent().showWidget(LoadingWidget)
+        self.hide()
+        self.deleteLater()
+
+
+class LoadingWidget(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(LoadingWidget, self).__init__(*args, **kwargs)
+        
+        self._animation = QMovie(os.path.join(RESOURCE_PATH, "spinner.gif"))
+        self._animation.setScaledSize(QSize(50, 50))
+
+        layout = QVBoxLayout()
+
+        self._label = QLabel()
+        self._label.setMovie(self._animation)
+
+        layout.addWidget(self._label, alignment=Qt.AlignCenter)
+
+        self.setLayout(layout)
+
+        self.start()
 
     def start(self):
-        print('Trying to connect to {}:{}....'.format(self.host, self.port))
+        self._animation.start()
 
-        self.sock.connect((self.host, self.port))
+    def stop(self):
+        self._animation.stop()
 
-        print('Succesfully connected to {}:{}'.format(self.host, self.port))
-        print('')
 
-        name = input('Your Name: ')
-        self.name = name
-
-        # Create send and receive threads
-        send = Send(self.sock, self.name)
-        receive = Receive(self.sock, self.name)
+class MessageWidget(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(MessageWidget, self).__init__(*args, **kwargs)
         
-        # start send and receive thread
-        send.start()
-        receive.start()
+        layout = QVBoxLayout()
+        component_layout = QHBoxLayout()
 
-        self.sock.sendall("[auth];{};[end]".format(name).encode('utf-8'))
+        self.search = QLineEdit()
+        self.search.setFont(DEFAULT_FONT)
+        self.search.setPlaceholderText("Search (blom jadi)")
+        self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.search.setStyleSheet(SEARCH_BAR_STYLE)
+
+        layout.addWidget(self.search, 1)
+
+        self.listMessage = QListWidget()
+        self.listMessage.setStyleSheet("* { border: none; }")
+        self.listMessage.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.listMessage.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         
-        print('Welcome, {}! Getting ready to send and receive messages...'.format(self.name))
+        layout.addWidget(self.listMessage, 9)
         
-        print("""\rReady! Type 'QUIT' to cabskuy""")
-        print('{}: '.format(self.name), end= '')
-        
-        return receive
+        self.message_input = QLineEdit()
+        self.message_input.setFont(DEFAULT_FONT)
+        self.message_input.setPlaceholderText("Type message")
+        self.message_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.message_input.setStyleSheet(LINEEDIT_STYLE)
+        self.message_input.returnPressed.connect(lambda: print(self.message_input.text()))
 
-    def send(self, message):
-        # Sends textInput data from the GUI
-        if self.messages:
+        layout.addWidget(self.message_input, 1)
 
-            # Type 'QUIT' to leave the chat
-            if message == "QUIT":
-                self.quit()
+        component_layout.addSpacing(10)
 
-            # SEND message to the server for broadcasting
-            else:
-                self.messages.see(tk.END)
-                try:
-                    self.sock.sendall('[message];{}: {};[end]'.format(self.name, message).encode('utf-8'))
-                except Exception as e:
-                    print(str(e))
-                    return
-            
-            self.messages.insert(tk.END, '{}: {}'.format(self.name, message))
+        def add_component_button(action, icon, tooltip):
+            button = QPushButton(icon, "")
+            button.setFont(DEFAULT_FONT_BOLD)
+            button.setFixedSize(32, 32)
+            button.setStyleSheet(COMPONENT_BUTTON_STYLE)
+            button.setIconSize(QSize(16, 16))
+            button.setToolTip(tooltip)
 
-    def sendData(self, id, question, answer):
-        if not self.questions or not self.answers:
-            return
-        
-        if len(question) <= 0:
-            question = " "
-            
-        if len(answer) <= 0:
-            answer = " "
+            button.pressed.connect(action)
 
-        try:
-            self.sock.sendall("[new data];{};{};{};[end]".format(question, answer, id[0]).encode('utf-8'))
-        except Exception as e:
-            print(str(e))
-            return
+            component_layout.addWidget(button, 1)
 
-        self.questions.delete(id)
-        self.questions.insert(id, question)
-        
-        self.answers.delete(id)
-        self.answers.insert(id, answer)
+            return button
 
-        if len(self.questions.get(tk.END)) > 0:
-            self.answers.insert(tk.END, '')
-            self.questions.insert(tk.END, '')
-
-        self.questions.see(id[0] + 1)
-        self.answers.see(id[0] + 1)
-
-    def sendFile(self, id, file):
-        if not self.questions or not self.answers:
-            return
-
-        message = "[file];"
-        for i, content in enumerate(file):
-            message += content + ";"
-            self.questions.insert((id[0] + i,), content)
-            self.answers.insert((id[0] + i,), " ")
-
-        message += "[end]"
-
-        try:
-            self.sock.sendall(message.encode('utf-8'))
-        except Exception as e:
-            print(str(e))
-            return
-
-    def request(self):
-        self.sock.sendall("[request data];[end]".encode('utf-8'))
-
-    def quit(self):
-        self.sock.sendall('[message];Server: {} has left the chat;[end]'.format(self.name).encode('utf-8'))
-        print('\nQuitting...')
-        self.sock.close()
-        os._exit(0)
-
-
-def main(host, port):
-    # initialize and run GUI app
-
-    client = Client(host, port)
-    receive = client.start()
-
-    window = tk.Tk()
-    window.title("Megalitikum Robotikum (versi lite)")
-
-    fromMessage = tk.Frame(master=window)
-    scrollBar = tk.Scrollbar(master=fromMessage)
-    messages = tk.Listbox(master=fromMessage, yscrollcommand=scrollBar.set)
-    scrollBar.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
-    messages.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-    def scroll(*args):
-        messages.yview(*args)
-    
-    scrollBar.config(command=scroll)
-
-    client.messages = messages
-    receive.messages = messages
-
-    fromMessage.grid(row=0, column=0, columnspan=3, sticky="nsew")
-    fromEntry = tk.Frame(master=window)
-    textInput = tk.Entry(master=fromEntry)
-
-    def send():
-        message = textInput.get()
-
-        if message.__contains__("[math]"):
-            try:
-                equation = message.split('[math] ')[1]
-                message += " = " + str(sy.sympify(equation))
-            except:
-                messages.insert(tk.END, "System: [ERROR] wrong input for math")
-                return
-
-        textInput.delete(0, tk.END)
-        client.send(message)
-
-    textInput.pack(fill=tk.BOTH, expand=True)
-    textInput.bind("<Return>", lambda x: send())
-    textInput.insert(0, "Insert your message here!")
-
-    btnSend = tk.Button(
-        master=window,
-        text="Send",
-        command=lambda: send()
-    )
-    btnGdocs = tk.Button(
-        master=window,
-        text="GDocs",
-        command=lambda: openGDocs(window, btnGdocs, client, receive)
-    )
-
-    fromEntry.grid(row=1, column=0, padx=10, sticky="ew")
-    btnSend.grid(row=1, column=1, pady=10, sticky="ew")
-    btnGdocs.grid(row=1, column=2, pady=10, sticky="ew")
-
-    window.rowconfigure(0, minsize=500, weight=1)
-    window.rowconfigure(1, minsize=50, weight=0)
-    window.columnconfigure(0, minsize=500, weight=1)
-    window.columnconfigure(1, minsize=100, weight=0)
-    window.columnconfigure(2, minsize=100, weight=0)
-
-    window.mainloop()
-
-    client.quit()
-
-
-def openGDocs(parent, button, client, receive):
-    window = tk.Toplevel(parent)
-    window.title("The Jidoks (versi lite)")
-
-    fromMessage = tk.Frame(master=window)
-    scrollBar = tk.Scrollbar(master=fromMessage)
-    questions = tk.Listbox(master=fromMessage, yscrollcommand=scrollBar.set)
-    answers = tk.Listbox(master=fromMessage, yscrollcommand=scrollBar.set)
-    scrollBar.pack(side=tk.RIGHT, fill=tk.Y, expand=False)
-    questions.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    answers.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
-    
-    client.answers = answers
-    client.questions = questions
-
-    receive.answers = answers
-    receive.questions = questions
-
-    def scroll(*args):
-        questions.yview(*args)
-        answers.yview(*args)
-
-    def mousewheel(event, lb):
-        lb.yview_scroll(int(-4*(event.delta/120)), "units")
-
-    scrollBar.config(command=scroll)
-
-    questions.bind("<MouseWheel>", lambda e: mousewheel(e, answers))
-    answers.bind("<MouseWheel>", lambda e: mousewheel(e, questions))
-
-    client.request()
-
-    answers.bind('<<ListboxSelect>>', lambda x: questions.selection_clear(0))
-    questions.bind('<<ListboxSelect>>', lambda x: answers.selection_clear(0))
-
-    fromMessage.grid(row=0, column=0, columnspan=4, sticky="nsew")
-    fromEntry = tk.Frame(master=window)
-    textInput = tk.Entry(master=fromEntry)
-    textInput.insert(0, "Insert your question/answer here!")
-
-    def sendQnA():
-        if len(questions.curselection()) > 0:
-            index = questions.curselection()
-            client.sendData(
-                index, 
-                textInput.get(),
-                answers.get(index)
-            )
-            answers.selection_clear(0)
-            questions.selection_set(index[0] + 1)
-
-        elif len(answers.curselection()) > 0:
-            index = answers.curselection()
-            client.sendData(
-                index, 
-                questions.get(index),
-                textInput.get()
-            )
-            questions.selection_clear(0)
-            answers.selection_set(index[0] + 1)
-
-        else:
-            return
-
-        textInput.delete(0, tk.END)
-
-    textInput.pack(fill=tk.BOTH, expand=True)
-    textInput.bind(
-        "<Return>", 
-        lambda x: sendQnA()
-    )
-    
-    btnSend = tk.Button(
-        master=window,
-        text="Send",
-        command=sendQnA
-    )
-
-    btnRefresh = tk.Button(
-        master=window,
-        text="Refresh",
-        command=lambda: client.request()
-    )
-
-    def sendFile():
-        path = tk.filedialog.askopenfilename(
-            initialdir = "/",
-            title = "Select a File",
-            filetypes = (
-                ("text files", "*.txt"),
-                ('All files', '*.*')
-            )
+        gdocs_button = add_component_button(
+            lambda: print("test"), 
+            qta.icon("mdi.file-document-outline"),
+            "gdocs"
+        )
+        math_button = add_component_button(
+            lambda: print("test"), 
+            qta.icon("mdi.math-integral"),
+            "math solver"
+        )
+        image_button = add_component_button(
+            lambda: print("test"), 
+            qta.icon("fa.file-image-o"),
+            "send image"
+        )
+        file_button = add_component_button(
+            lambda: print("test"), 
+            qta.icon("ri.attachment-line"),
+            "send attachment"
         )
 
-        with open(path) as f:
-            contents = f.readlines()
+        component_layout.addWidget(Color("purple"), 10)
+        
+        component_layout.addSpacing(10)
+
+        layout.addLayout(component_layout, 1)
+
+        self.setLayout(layout)
+
+        self.message_input.setFocus()
+
+    def addIncomeItem(self, username, message):
+        message = IncomeChatBubble(username, message)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
+
+    def addOutcomeItem(self, username, message):
+        message = OutcomeChatBubble(username, message)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
+
+    def addIncomeImageBubble(self, username, image):
+        message = IncomeImageBubble(username, image)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
+        
+    def addOutcomeImageBubble(self, username, image):
+        message = OutcomeImageBubble(username, image)
+        widgetItem = QListWidgetItem(self.listMessage)
+        widgetItem.setSizeHint(message.sizeHint())
+        self.listMessage.addItem(widgetItem)
+        self.listMessage.setItemWidget(widgetItem, message)
+
+
+class IncomeChatBubble(QWidget):
+    def __init__(self, username, message, *args, **kwargs):
+        super(IncomeChatBubble, self).__init__(*args, **kwargs)
+
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setLineWidth(1)
+        frame.setLayout(QVBoxLayout())
+        frame.setStyleSheet(BUBBLE_INCOME_STYLE)
+        
+        frame_h_layout = QHBoxLayout()
+        frame_h_layout.addWidget(frame, 0)
+        frame_h_layout.addWidget(Color("red"), 5)
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignLeft)
+        
+        layout.addLayout(frame_h_layout, 3)
+        
+        self.message = QLabel(message)
+        self.message.setFont(DEFAULT_FONT)
+        self.message.setWordWrap(True)
+        self.message.setStyleSheet("* { background-color: transparent; border: none; }")
+        frame.layout().addWidget(self.message, alignment=Qt.AlignTop | Qt.AlignLeft)
+
+        self.setLayout(layout)
+
+    def __str__(self) -> str:
+        return self.message.text()
+
+
+class OutcomeChatBubble(QWidget):
+    def __init__(self, username, message, *args, **kwargs):
+        super(OutcomeChatBubble, self).__init__(*args, **kwargs)
+
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setLineWidth(1)
+        frame.setLayout(QVBoxLayout())
+        frame.setStyleSheet(BUBBLE_OUTCOME_STYLE)
+        
+        frame_h_layout = QHBoxLayout()
+        frame_h_layout.addWidget(Color("red"), 5)
+        frame_h_layout.addWidget(frame, 0)
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignRight)
+        
+        layout.addLayout(frame_h_layout, 3)
+        
+        self.message = QLabel(message)
+        self.message.setFont(DEFAULT_FONT)
+        self.message.setWordWrap(True)
+        self.message.setStyleSheet("* { background-color: transparent; border: none; }")
+        frame.layout().addWidget(self.message, alignment=Qt.AlignTop | Qt.AlignRight)
+
+        self.setLayout(layout)
+
+    def __str__(self) -> str:
+        return self.message.text()
+
+
+class ImageViewer(QWidget):
+    def __init__(self, image, *args, **kwargs):
+        super(ImageViewer, self).__init__(*args, **kwargs)
+
+        pixmap = QPixmap(image)
+        pixmap = pixmap.scaled(
+            QSize(
+                min(
+                    pixmap.width(),
+                    800
+                ),
+                min(
+                    pixmap.height(),
+                    600
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        self.image_label = QLabel(self)
+        self.image_label.setScaledContents(True)
+        self.image_label.setBackgroundRole(QPalette.Base)
+        self.image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.image_label.setPixmap(pixmap)
+
+        self.setFixedSize(pixmap.size())
+
+
+class IncomeImageBubble(QWidget):
+    def __init__(self, username, image, *args, **kwargs):
+        super(IncomeImageBubble, self).__init__(*args, **kwargs)
+
+        self.image = image
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.layout().addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignLeft)
+
+        image_layout = QHBoxLayout()
+
+        self.image_label = QLabel()
+        self.image_label.setMaximumHeight(200)
+        self.image_label.setMaximumWidth(300)
+        original_pixmap = QPixmap(self.image)
+        original_pixmap = original_pixmap.scaled(
+            QSize(
+                min(
+                    original_pixmap.width(),
+                    self.image_label.maximumWidth()
+                ),
+                min(
+                    original_pixmap.height(),
+                    self.image_label.maximumHeight()
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        pixmap = QPixmap(original_pixmap.size())
+        pixmap.fill(QColor("transparent"))
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(original_pixmap))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(original_pixmap.rect(), 10, 10)
+
+        self.image_label.setPixmap(pixmap)
+        self.image_label.mousePressEvent = self.openImage
+        
+        del painter
+
+        image_layout.addWidget(self.image_label, 0)
+        image_layout.addWidget(Color("red"), 5)
+
+        layout.addLayout(image_layout)
+
+        self.setLayout(layout)
+
+    def openImage(self, event):
+        global OTHER_WINDOW
+        self.w = ImageViewer(self.image)
+        self.w.show()
+
+        OTHER_WINDOW.append(self.w)
+
+
+class OutcomeImageBubble(QWidget):
+    def __init__(self, username, image, *args, **kwargs):
+        super(OutcomeImageBubble, self).__init__(*args, **kwargs)
+
+        self.image = image
+
+        layout = QVBoxLayout()
+
+        self.username = QLabel(username)
+        self.username.setFont(DEFAULT_FONT_BOLD)
+        self.username.setStyleSheet("* { background-color: transparent; }")
+        layout.layout().addWidget(self.username, 0, alignment=Qt.AlignTop | Qt.AlignRight)
+
+        image_layout = QHBoxLayout()
+
+        self.image_label = QLabel()
+        self.image_label.setMaximumHeight(200)
+        self.image_label.setMaximumWidth(300)
+        original_pixmap = QPixmap(self.image)
+        original_pixmap = original_pixmap.scaled(
+            QSize(
+                min(
+                    original_pixmap.width(),
+                    self.image_label.maximumWidth()
+                ),
+                min(
+                    original_pixmap.height(),
+                    self.image_label.maximumHeight()
+                )
+            ),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+        pixmap = QPixmap(original_pixmap.size())
+        pixmap.fill(QColor("transparent"))
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(original_pixmap))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(original_pixmap.rect(), 10, 10)
+
+        self.image_label.setPixmap(pixmap)
+        self.image_label.mousePressEvent = self.openImage
+        
+        del painter
+
+        image_layout.addWidget(Color("red"), 5)
+        image_layout.addWidget(self.image_label, 0)
+
+        layout.addLayout(image_layout)
+
+        self.setLayout(layout)
+
+    def openImage(self, event):
+        global OTHER_WINDOW
+        self.w = ImageViewer(self.image)
+        self.w.show()
+
+        OTHER_WINDOW.append(self.w)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        # Window setup
+        self.setWindowTitle(WINDOW_TITLE)
+        self.setWindowIcon(QIcon(LOGO_PATH_ICO))
+        self.setFixedSize(WINDOW_SIZE)
+        self.setStyleSheet(WINDOW_STYLE)
+        
+        # ask user the Host/server IP address
+        self.showWidget(AuthWidget)
+
+        # Show window, windows are hidden by default.
+        self.show()
+
+    def closeEvent(self, event):
+        global OTHER_WINDOW
+        for window in OTHER_WINDOW:
+            window.close()
             
-        client.sendFile((questions.size() - 1,), contents)
+        event.accept()
 
-    btnUpload = tk.Button(
-        master=window,
-        text="Upload",
-        command=lambda: sendFile()
-    )
-
-    fromEntry.grid(row=1, column=0, padx=10, sticky="ew")
-    btnSend.grid(row=1, column=1, pady=10, sticky="ew")
-    btnRefresh.grid(row=1, column=2, pady=10, sticky="ew")
-    btnUpload.grid(row=1, column=3, pady=10, sticky="ew")
-    
-    window.rowconfigure(0, minsize=500, weight=1)
-    window.rowconfigure(1, minsize=50, weight=0)
-    window.columnconfigure(0, minsize=500, weight=1)
-    window.columnconfigure(1, minsize=100, weight=0)
-    window.columnconfigure(2, minsize=100, weight=0)
-    window.columnconfigure(3, minsize=100, weight=0)
-
-    def changeButtonState():
-        if button['state'] == "normal":
-            button['state'] = "disable"
-        else:
-            button['state'] = "normal"
-            
-            client.answers = None
-            client.questions = None
-
-            receive.answers = None
-            receive.questions = None
-
-            if window:
-                window.destroy()
-
-    changeButtonState()
-
-    window.protocol('WM_DELETE_WINDOW', lambda: changeButtonState())
+    def showWidget(self, widget, *args):
+        self.currentWidget = widget(self)
+        self.setCentralWidget(self.currentWidget)
 
 
 if __name__ == "__main__":
-    host = input('Host: ')
-    port = int(input('Port (default 1060): ') or "1060")
+    # Only need one QApplication instance per application.
+    # Pass in sys.argv to allow command line arguments for your app.
+    # If you know you won't use command line arguments QApplication([]) works too.
+    app = QApplication(sys.argv)
 
-    main(host, port)
+    # Create a Qt main window, which will be our window.
+    window = MainWindow()
+
+    # Start the event loop.
+    app.exec_()
+
+
+    # Application won't reach here until you exit and the event
+    # loop has stopped.
