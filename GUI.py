@@ -3,6 +3,9 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+# UI Components
+import qtawesome as qta
+
 # Needed to access some system data
 import sys
 import os
@@ -55,7 +58,16 @@ SUBMIT_BUTTON_STYLE = """
 COMPONENT_BUTTON_STYLE = """
 * {
     background-color: transparent;
-    border: none;
+    border: 1px hidden white;
+    border-radius: 3px;
+}
+*:hover {
+    background-color: #d9d8eb;
+    border: 1px solid #d9d8eb;
+}
+*:pressed {
+    background-color: #c4c3d9;
+    border: 1px solid #c4c3d9;
 }
 """
 
@@ -194,15 +206,16 @@ class MessageWidget(QWidget):
         self.message_input.setPlaceholderText("Type message")
         self.message_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.message_input.setStyleSheet(LINEEDIT_STYLE)
+        self.message_input.returnPressed.connect(lambda: print(self.message_input.text()))
 
         layout.addWidget(self.message_input, 1)
 
         component_layout.addSpacing(10)
 
-        def add_component_button(action, text):
-            button = QPushButton(text)
+        def add_component_button(action, icon):
+            button = QPushButton(icon, "")
             button.setFont(DEFAULT_FONT_BOLD)
-            button.setFixedSize(20, 20)
+            button.setFixedSize(24, 24)
             button.setStyleSheet(COMPONENT_BUTTON_STYLE)
             button.setIconSize(QSize(20, 20))
 
@@ -214,19 +227,19 @@ class MessageWidget(QWidget):
 
         gdocs_button = add_component_button(
             lambda: print("test"), 
-            "1"
+            qta.icon("mdi.file-document-outline")
         )
         math_button = add_component_button(
             lambda: print("test"), 
-            "2"
+            qta.icon("mdi.math-integral")
         )
         image_button = add_component_button(
             lambda: print("test"), 
-            "3"
+            qta.icon("fa.file-image-o")
         )
         file_button = add_component_button(
             lambda: print("test"), 
-            "4"
+            qta.icon("ri.attachment-line")
         )
 
         component_layout.addWidget(Color("purple"), 10)
@@ -236,6 +249,15 @@ class MessageWidget(QWidget):
         layout.addLayout(component_layout, 1)
 
         self.setLayout(layout)
+
+        self.message_input.setFocus()
+
+
+class ChatBubble(QWidget):
+    def __init__(self, *args, **kwargs):
+        super(ChatBubble, self).__init__(*args, **kwargs)
+
+        
 
 
 class MainWindow(QMainWindow):
